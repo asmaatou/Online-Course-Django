@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def registration_request(request):
     context = {}
     if request.method == 'GET':
-        return render(request, 'onlinecourse/user_registration_bootstrap.html', context)
+        return render(request, 'onlinecourse/user_registration.html', context)
     elif request.method == 'POST':
         # Check if user exists
         username = request.POST['username']
@@ -36,7 +36,7 @@ def registration_request(request):
             return redirect("onlinecourse:index")
         else:
             context['message'] = "User already exists."
-            return render(request, 'onlinecourse/user_registration_bootstrap.html', context)
+            return render(request, 'onlinecourse/user_registration.html', context)
 
 
 def login_request(request):
@@ -50,9 +50,9 @@ def login_request(request):
             return redirect('onlinecourse:index')
         else:
             context['message'] = "Invalid username or password."
-            return render(request, 'onlinecourse/user_login_bootstrap.html', context)
+            return render(request, 'onlinecourse/user_login.html', context)
     else:
-        return render(request, 'onlinecourse/user_login_bootstrap.html', context)
+        return render(request, 'onlinecourse/user_login.html', context)
 
 
 def logout_request(request):
@@ -72,7 +72,7 @@ def check_if_enrolled(user, course):
 
 # CourseListView
 class CourseListView(generic.ListView):
-    template_name = 'onlinecourse/course_list_bootstrap.html'
+    template_name = 'onlinecourse/course_list.html'
     context_object_name = 'course_list'
 
     def get_queryset(self):
@@ -86,7 +86,7 @@ class CourseListView(generic.ListView):
 
 class CourseDetailView(generic.DetailView):
     model = Course
-    template_name = 'onlinecourse/course_detail_bootstrap.html'
+    template_name = 'onlinecourse/course_detail.html'
 
 
 def enroll(request, course_id):
