@@ -1,163 +1,164 @@
-from django.shortcuts import get_object_or_404,render, redirect
-from django.urls import reverse
-from django.http import HttpResponseRedirect,Http404
-from django.views import generic
+from django.shortcuts import render
+from django.http import HttpResponseRedirect
+# <HINT> Import any new Models here
+from .models import Course, Enrollment, Question, Choice, Submission
 from django.contrib.auth.models import User
-from .models import *
+from django.shortcuts import get_object_or_404, render, redirect
+from django.urls import reverse
+from django.views import generic
 from django.contrib.auth import login, logout, authenticate
-from django.views import View
 import logging
 
+# Get an instance of a logger
 logger = logging.getLogger(__name__)
 # Create your views here.
 
-def popular_course_list(request):
-    context = {}
-    # If the request method is GET
-    if request.method == 'GET':
-        # Using the objects model manage to read all course list
-        # and sort them by total_enrollment descending
-        course_list = Course.objects.order_by('-total_enrollment')[:10]
-        # Appen the course list as an entry of context dict
-        context['course_list'] = course_list
-        return render(request, 'onlinecourse/course_list.html', context)
-
-def enroll(request, course_id):
-    # If request method is POST
-    if request.method == 'POST':
-        # First try to read the course object
-        # If could be found, raise a 404 exception
-        course = get_object_or_404(Course, pk=course_id)
-        # Increase the enrollment by 1
-        course.total_enrollment += 1
-        course.save()
-        # Return a HTTP response redirecting user to course list view
-        return HttpResponseRedirect(reverse(viewname='onlinecourse:course_details', args=(course.id,)))
-
-
-
-def course_details(request, course_id):
-    context = {}
-    if request.method == 'GET':
-        try:
-            course = Course.objects.get(pk=course_id)
-            context['course'] = course
-            # Use render() method to generate HTML page by combining
-            # template and context
-            return render(request, 'onlinecourse/course_detail.html', context)
-        except Course.DoesNotExist:
-            # If course does not exist, throw a Http404 error
-            raise Http404("No course matches the given id.")
-
-
-class EnrollView(View):
-
-    # Handles post request
-    def post(self, request, *args, **kwargs):
-        course_id = kwargs.get('pk')
-        course = get_object_or_404(Course, pk=course_id)
-        # Increase total enrollment by 1
-        course.total_enrollment += 1
-        course.save()
-        return HttpResponseRedirect(reverse(viewname='onlinecourse:course_details', args=(course.id,)))
-
-# Note that CourseListView is subclassing from generic.ListView instead of View
-# so that it can use attributes and override methods from ListView such as get_queryset()
-class CourseListView(generic.ListView):
-    template_name = 'onlinecourse/course_list.html'
-    context_object_name = 'course_list'
-
-    # Override get_queryset() to provide list of objects
-    def get_queryset(self):
-       courses = Course.objects.order_by('-total_enrollment')[:10]
-       return courses
-
-# Note that CourseDetailsView is now subclassing DetailView 
-class CourseDetailsView(generic.DetailView):
-    model = Course
-    template_name = 'onlinecourse/course_detail.html'
-
-def logout_request(request):
-    # Get the user object based on session id in request
-    print("Log out the user `{}`".format(request.user.username))
-    # Logout user in the request
-    logout(request)
-    # Redirect user back to course list view
-    return redirect('onlinecourse:popular_course_list')
-
-def login_request(request):
-    context = {}
-    # Handles POST request
-    if request.method == "POST":
-        # Get username and password from request.POST dictionary
-        username = request.POST['username']
-        password = request.POST['psw']
-        # Try to check if provide credential can be authenticated
-        user = authenticate(username=username, password=password)
-        if user is not None:
-            # If user is valid, call login method to login current user
-            login(request, user)
-            return redirect('onlinecourse:popular_course_list')
-        else:
-            # If not, return to login page again
-            return render(request, 'onlinecourse/user_login.html', context)
-    else:
-        return render(request, 'onlinecourse/user_login.html', context)
-
-
 def registration_request(request):
     context = {}
-    # If it is a GET request, just render the registration page
     if request.method == 'GET':
-        return render(request, 'onlinecourse/user_registration.html', context)
-    # If it is a POST request
+        return render(request, 'onlinecourse/user_registration_bootstrap.html', context)
     elif request.method == 'POST':
-        # Get user information from request.POST
+        # Check if user exists
         username = request.POST['username']
         password = request.POST['psw']
         first_name = request.POST['firstname']
         last_name = request.POST['lastname']
         user_exist = False
         try:
-            # Check if user already exists
             User.objects.get(username=username)
             user_exist = True
         except:
-            # If not, simply log this is a new user
-            logger.debug("{} is new user".format(username))
-        # If it is a new user
+            logger.error("New user")
         if not user_exist:
-            # Create user in auth_user table
             user = User.objects.create_user(username=username, first_name=first_name, last_name=last_name,
                                             password=password)
-            # Login the user and redirect to course list page
             login(request, user)
-            return redirect("onlinecourse:popular_course_list")
+            return redirect("onlinecourse:index")
         else:
-            return render(request, 'onlinecourse/user_registration.html', context)
+            context['message'] = "User already exists."
+            return render(request, 'onlinecourse/user_registration_bootstrap.html', context)
 
 
-""" # Note that we are subclassing CourseListView from base View class
-class CourseListView(View):
+def login_request(request):
+    context = {}
+    if request.method == "POST":
+        username = request.POST['username']
+        password = request.POST['psw']
+        user = authenticate(username=username, password=password)
+        if user is not None:
+            login(request, user)
+            return redirect('onlinecourse:index')
+        else:
+            context['message'] = "Invalid username or password."
+            return render(request, 'onlinecourse/user_login_bootstrap.html', context)
+    else:
+        return render(request, 'onlinecourse/user_login_bootstrap.html', context)
 
-    # Handles get request
-    def get(self, request):
-        context = {}
-        course_list = Course.objects.order_by('-total_enrollment')[:10]
-        context['course_list'] = course_list
-        return render(request, 'onlinecourse/course_list.html', context)            
+
+def logout_request(request):
+    logout(request)
+    return redirect('onlinecourse:index')
 
 
-class CourseDetailsView(View):
+def check_if_enrolled(user, course):
+    is_enrolled = False
+    if user.id is not None:
+        # Check if user enrolled
+        num_results = Enrollment.objects.filter(user=user, course=course).count()
+        if num_results > 0:
+            is_enrolled = True
+    return is_enrolled
 
-    # Handles get request
-    def get(self, request, *args, **kwargs):
-        context = {}
-        # We get URL parameter pk from keyword argument list as course_id
-        course_id = kwargs.get('pk')
-        try:
-            course = Course.objects.get(pk=course_id)
-            context['course'] = course
-            return render(request, 'onlinecourse/course_detail.html', context)
-        except Course.DoesNotExist:
-            raise Http404("No course matches the given id.") """
+
+# CourseListView
+class CourseListView(generic.ListView):
+    template_name = 'onlinecourse/course_list_bootstrap.html'
+    context_object_name = 'course_list'
+
+    def get_queryset(self):
+        user = self.request.user
+        courses = Course.objects.order_by('-total_enrollment')[:10]
+        for course in courses:
+            if user.is_authenticated:
+                course.is_enrolled = check_if_enrolled(user, course)
+        return courses
+
+
+class CourseDetailView(generic.DetailView):
+    model = Course
+    template_name = 'onlinecourse/course_detail_bootstrap.html'
+
+
+def enroll(request, course_id):
+    course = get_object_or_404(Course, pk=course_id)
+    user = request.user
+
+    is_enrolled = check_if_enrolled(user, course)
+    if not is_enrolled and user.is_authenticated:
+        # Create an enrollment
+        Enrollment.objects.create(user=user, course=course, mode='honor')
+        course.total_enrollment += 1
+        course.save()
+
+    return HttpResponseRedirect(reverse(viewname='onlinecourse:course_details', args=(course.id,)))
+
+# A method to collect the selected choices from the exam form from the request object
+def extract_answers(request):
+    submitted_anwsers = []
+    for key in request.POST:
+        if key.startswith('choice'):
+            value = request.POST[key]
+            choice_id = int(value)
+            submitted_anwsers.append(choice_id)
+    return submitted_anwsers
+         
+
+# <HINT> Create a submit view to create an exam submission record for a course enrollment,
+# you may implement it based on following logic:
+         # Get user and course object, then get the associated enrollment object created when the user enrolled the course
+         # Create a submission object referring to the enrollment
+         # Collect the selected choices from exam form
+         # Add each selected choice object to the submission object
+         # Redirect to show_exam_result with the submission id
+
+def submit(request, course_id):
+    user = request.user
+    course = get_object_or_404(Course, pk=course_id)
+    enrollment = Enrollment.objects.get(user=user, course=course)
+    choices_id = extract_answers(request)
+    submission = Submission.objects.create(enrollment=enrollment)
+    for choice_id in choices_id:
+        submission.choices.add(Choice.objects.get(pk=choice_id))
+    submission.save()
+    return HttpResponseRedirect(reverse(viewname='onlinecourse:show_exam_result', args=(course.id, submission.id)))
+
+
+# <HINT> Create an exam result view to check if learner passed exam and show their question results and result for each question,
+# you may implement it based on the following logic:
+        # Get course and submission based on their ids
+        # Get the selected choice ids from the submission record
+        # For each selected choice, check if it is a correct answer or not
+        # Calculate the total score
+def show_exam_result(request, course_id, submission_id):
+    course = get_object_or_404(Course, pk=course_id)
+    submission = get_object_or_404(Submission, pk=submission_id)
+
+    context = {}
+    selected_ids = []
+    grade = 0
+    total_grade = 0
+    for choice in submission.choices.all():
+        selected_ids.append(choice.id)
+        total_grade += choice.question.grade
+        if choice.is_correct:
+            grade += choice.question.grade
+    
+    context['course'] = course
+    context['selected_ids'] = selected_ids
+    context['grade'] = grade
+    context['total_grade'] = total_grade
+
+    return render(request, 'onlinecourse/exam_result_bootstrap.html', context)
+
+
+
